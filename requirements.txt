@@ -8,3 +8,4 @@ soundfile>=0.12
 accelerate>=0.30
 sentencepiece>=0.2
 numpy>=1.24
+imageio-ffmpeg>=0.5

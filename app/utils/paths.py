@@ -63,7 +63,12 @@ def get_dictionary_path() -> str:
     return os.path.join(get_runtime_dir(), "Dictionary.txt")
 
 
+def get_temp_dir() -> str:
+    """取得暫存目錄路徑（影片抽音暫存）。"""
+    return os.path.join(get_runtime_dir(), "temp")
+
+
 def ensure_runtime_dirs():
     """確保所有 runtime 子目錄存在。"""
-    for d in [get_runtime_dir(), get_output_dir(), get_logs_dir(), get_models_dir()]:
+    for d in [get_runtime_dir(), get_output_dir(), get_logs_dir(), get_models_dir(), get_temp_dir()]:
         os.makedirs(d, exist_ok=True)

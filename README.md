@@ -2,12 +2,13 @@
 
 基於 [MediaTek-Research/Breeze-ASR-25](https://huggingface.co/MediaTek-Research/Breeze-ASR-25) 模型的 Windows 桌面語音轉文字工具。
 
-支援批次處理 MP3/WAV 音檔，自動分段辨識並匯出 TXT / SRT 字幕檔。
+支援批次處理 MP3/WAV 音檔及 MP4/MOV/MKV/AVI/WEBM 影片檔（自動抽取音軌），自動分段辨識並匯出 TXT / SRT 字幕檔。
 
 ## 功能
 
 - **GPU 加速辨識** — 自動偵測 NVIDIA GPU，支援 CUDA 加速
-- **批次處理** — 拖放多個音檔或整個資料夾，一鍵開始轉錄
+- **影片音軌抽取** — 支援 MP4/MOV/MKV/AVI/WEBM 影片，自動抽取音軌轉錄
+- **批次處理** — 拖放多個音檔/影片或整個資料夾，一鍵開始轉錄
 - **多種匯出格式** — TXT（逐段）、完整 TXT、SRT 字幕
 - **字典功能** — 自訂常用詞彙，提升辨識準確度
 - **模型管理** — 支援下載、切換、刪除模型
@@ -29,7 +30,7 @@
 2. 解壓縮到任意目錄
 3. 執行 `BreezeASRDesktop.exe`
 4. 首次啟動時，至「模型管理」下載 Breeze ASR 25 模型
-5. 拖放或匯入音檔 → 點擊「開始」
+5. 拖放或匯入音檔/影片 → 點擊「開始」
 
 > 若模型已在 HuggingFace 快取中（`~/.cache/huggingface/`），程式會自動偵測使用。
 
@@ -73,6 +74,7 @@ app/
 │   ├── transcriber.py      # Whisper ASR 引擎
 │   ├── audio_loader.py     # 音訊載入（librosa）
 │   ├── audio_segmenter.py  # 音訊分段
+│   ├── audio_extractor.py  # 影片音軌抽取（ffmpeg）
 │   ├── task_manager.py     # 任務佇列管理
 │   ├── exporter.py         # TXT/SRT 匯出
 │   ├── dictionary_manager.py  # 字典管理
@@ -95,7 +97,8 @@ runtime/                    # 執行期目錄（自動建立）
 ├── Dictionary.txt          # 字典檔
 ├── output/                 # 辨識結果
 ├── logs/                   # 日誌
-└── models/                 # 下載的模型
+├── models/                 # 下載的模型
+└── temp/                   # 影片抽音暫存檔
 ```
 
 ## 授權

@@ -8,7 +8,7 @@ from typing import List
 
 from PySide6.QtCore import QObject, Signal
 
-from app.utils.file_utils import is_supported_audio, scan_audio_files
+from app.utils.file_utils import is_supported_media, is_supported_video, scan_media_files
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ class TaskStatus(Enum):
     """任務狀態。"""
 
     PENDING = "pending"
+    EXTRACTING = "extracting"
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
@@ -30,6 +31,7 @@ class TaskItem:
     file_path: str
     file_name: str = ""
     file_type: str = ""
+    media_type: str = ""  # "audio" or "video"
     duration: float = 0.0
     status: TaskStatus = TaskStatus.PENDING
     device: str = ""
@@ -43,6 +45,8 @@ class TaskItem:
         if not self.file_type:
             _, ext = os.path.splitext(self.file_path)
             self.file_type = ext.lstrip(".").upper()
+        if not self.media_type:
+            self.media_type = "video" if is_supported_video(self.file_path) else "audio"
 
 
 class TaskManager(QObject):
@@ -77,8 +81,8 @@ class TaskManager(QObject):
         return task
 
     def add_tasks_from_folder(self, folder: str, recursive: bool = False) -> List[TaskItem]:
-        """從資料夾掃描並加入所有音檔任務。"""
-        files = scan_audio_files(folder, recursive=recursive)
+        """從資料夾掃描並加入所有媒體檔任務。"""
+        files = scan_media_files(folder, recursive=recursive)
         added = []
         for f in files:
             added.append(self.add_task(f))

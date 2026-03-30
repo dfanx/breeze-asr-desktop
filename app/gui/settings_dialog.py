@@ -62,6 +62,10 @@ class SettingsDialog(QDialog):
         self._recursive_check = QCheckBox("掃描子資料夾")
         form.addRow("", self._recursive_check)
 
+        # 保留暫存音檔
+        self._keep_temp_check = QCheckBox("保留影片抽取的暫存音檔")
+        form.addRow("", self._keep_temp_check)
+
         # 輸出格式
         self._txt_check = QCheckBox("輸出 .txt")
         self._full_check = QCheckBox("輸出 _full.txt")
@@ -89,6 +93,7 @@ class SettingsDialog(QDialog):
         self._gpu_check.setChecked(self._config.get("prefer_gpu", True))
         self._continue_check.setChecked(self._config.get("continue_on_error", True))
         self._recursive_check.setChecked(self._config.get("scan_subfolders", False))
+        self._keep_temp_check.setChecked(self._config.get("keep_temp_audio", False))
         self._txt_check.setChecked(self._config.get("export_txt", True))
         self._full_check.setChecked(self._config.get("export_full_txt", True))
         self._srt_check.setChecked(self._config.get("export_srt", True))
@@ -104,6 +109,7 @@ class SettingsDialog(QDialog):
         self._config["prefer_gpu"] = self._gpu_check.isChecked()
         self._config["continue_on_error"] = self._continue_check.isChecked()
         self._config["scan_subfolders"] = self._recursive_check.isChecked()
+        self._config["keep_temp_audio"] = self._keep_temp_check.isChecked()
         self._config["export_txt"] = self._txt_check.isChecked()
         self._config["export_full_txt"] = self._full_check.isChecked()
         self._config["export_srt"] = self._srt_check.isChecked()

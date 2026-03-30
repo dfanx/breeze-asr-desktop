@@ -7,5 +7,6 @@
   "export_full_txt": true,
   "export_srt": true,
   "scan_subfolders": false,
+  "keep_temp_audio": false,
   "default_model": "breeze_asr_25"
 }

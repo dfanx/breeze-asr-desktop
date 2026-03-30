@@ -5,7 +5,7 @@ import os
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from app.utils.file_utils import is_supported_audio
+from app.utils.file_utils import is_supported_media
 
 
 class FileDropArea(QWidget):
@@ -20,7 +20,7 @@ class FileDropArea(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        self._label = QLabel("將音檔或資料夾拖曳到此處\n或點擊下方按鈕加入")
+        self._label = QLabel("將音檔/影片或資料夾拖曳到此處\n或點擊下方按鈕加入")
         self._label.setAlignment(Qt.AlignCenter)
         self._label.setMinimumHeight(120)
         self._label.setStyleSheet(
@@ -36,7 +36,7 @@ class FileDropArea(QWidget):
         paths = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if os.path.isdir(path) or is_supported_audio(path):
+            if os.path.isdir(path) or is_supported_media(path):
                 paths.append(path)
         if paths:
             self.files_dropped.emit(paths)

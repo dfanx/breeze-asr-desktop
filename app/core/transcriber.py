@@ -124,7 +124,14 @@ class Transcriber:
             prompt_ids = prompt_ids.tolist() if hasattr(prompt_ids, "tolist") else list(prompt_ids)
 
         for i, seg in enumerate(segments):
-            logger.debug("轉錄片段 %d/%d (%.1fs - %.1fs)", i + 1, total, seg.start, seg.end)
+            logger.info("轉錄片段 %d/%d (%.1fs - %.1fs)", i + 1, total, seg.start, seg.end)
+
+            # 每段前先同步 GPU，確保前段操作完成
+            if torch.cuda.is_available() and self._device_info.device == "cuda":
+                try:
+                    torch.cuda.synchronize()
+                except Exception:
+                    pass
 
             # 準備輸入特徵
             input_features = self._processor(
@@ -153,12 +160,62 @@ class Transcriber:
                 )
 
             with torch.no_grad():
-                predicted_ids = self._model.generate(**generate_kwargs)
+                try:
+                    predicted_ids = self._model.generate(**generate_kwargs)
+                except RuntimeError as cuda_err:
+                    err_str = str(cuda_err)
+                    if "CUDA" in err_str or "out of memory" in err_str:
+                        logger.warning("CUDA 錯誤，自動降級到 CPU 重試: %s", err_str)
+                        # 釋放 VRAM 並將模型移到 CPU
+                        del input_features
+                        if generate_kwargs.get("prompt_ids") is not None:
+                            del generate_kwargs["prompt_ids"]
+                        del generate_kwargs
+                        gc.collect()
+                        try:
+                            torch.cuda.synchronize()
+                            torch.cuda.empty_cache()
+                        except Exception:
+                            pass
+                        self._model.to("cpu")
+                        self._device_info = DeviceInfo(
+                            device="cpu", dtype=torch.float32,
+                            device_name="CPU (從 GPU 降級)",
+                            is_gpu_available=False,
+                            fallback_reason=f"CUDA 錯誤: {err_str[:100]}",
+                        )
+                        # 重新準備輸入特徵於 CPU
+                        input_features = self._processor(
+                            seg.waveform, sampling_rate=sample_rate, return_tensors="pt"
+                        ).input_features
+                        generate_kwargs = {
+                            "input_features": input_features,
+                            "forced_decoder_ids": forced_decoder_ids,
+                            "max_new_tokens": max_new,
+                        }
+                        if prompt_ids is not None:
+                            generate_kwargs["prompt_ids"] = torch.tensor(
+                                prompt_ids, dtype=torch.long
+                            )
+                        predicted_ids = self._model.generate(**generate_kwargs)
+                    else:
+                        raise
 
             # 解碼
             text = self._processor.batch_decode(
                 predicted_ids, skip_special_tokens=True
             )[0].strip()
+
+            # 釋放 GPU tensor，避免 VRAM 累積
+            del input_features, predicted_ids
+            if generate_kwargs.get("prompt_ids") is not None:
+                del generate_kwargs["prompt_ids"]
+            del generate_kwargs
+            if torch.cuda.is_available():
+                try:
+                    torch.cuda.synchronize()
+                except Exception:
+                    pass
 
             result_segments.append(
                 TranscriptionSegment(start=seg.start, end=seg.end, text=text)
@@ -168,4 +225,14 @@ class Transcriber:
                 progress_callback(i + 1, total)
 
         full_text = "".join(seg.text for seg in result_segments)
+
+        # 每次轉錄完成後清理 GPU 快取
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        gc.collect()
+
         return TranscriptionResult(full_text=full_text, segments=result_segments)

@@ -1,8 +1,10 @@
 """主視窗模組 - Breeze ASR Desktop 主介面。"""
 
+import gc
 import logging
 import os
 
+import torch
 from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
 
 from app.core.audio_loader import load_audio
 from app.core.audio_segmenter import split_audio
+from app.core import audio_extractor
+from app.core.audio_extractor import is_supported_video
 from app.core.device_manager import DeviceInfo, get_device_info
 from app.core.dictionary_manager import DictionaryManager
 from app.core.exporter import export_full_txt, export_srt, export_txt
@@ -27,7 +31,7 @@ from app.gui.widgets.log_panel import LogPanel
 from app.gui.widgets.status_bar import StatusBar
 from app.gui.widgets.task_table import TaskTable
 from app.utils import json_utils, paths
-from app.utils.file_utils import is_supported_audio
+from app.utils.file_utils import is_supported_media
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +104,14 @@ class TranscriptionWorker(QThread):
         self._config = config
 
     def run(self):
+        try:
+            self._run_impl()
+        except Exception as e:
+            logger.error("轉錄執行緒未預期例外: %s", e, exc_info=True)
+            self.error_occurred.emit(-1, f"轉錄過程發生未預期錯誤: {e}")
+            self.all_finished.emit()
+
+    def _run_impl(self):
         # 載入模型（若尚未載入）
         try:
             self._transcriber.load_model(self._model_path, self._device_info)
@@ -126,6 +138,9 @@ class TranscriptionWorker(QThread):
         dm = DictionaryManager()
         prompt = dm.get_prompt()
 
+        # 暫存目錄
+        temp_dir = paths.get_temp_dir()
+
         pending = self._task_manager.get_pending_tasks()
 
         for idx, (task_index, task) in enumerate(pending):
@@ -143,13 +158,24 @@ class TranscriptionWorker(QThread):
             )
 
             try:
+                # 影片檔案先抽取音軌
+                if is_supported_video(task.file_path):
+                    self._task_manager.update_task(task_index, status=TaskStatus.EXTRACTING)
+                    audio_path = audio_extractor.extract_audio(task.file_path, temp_dir)
+                    logger.info("音軌抽取完成，開始載入: %s", os.path.basename(audio_path))
+                    self._task_manager.update_task(task_index, status=TaskStatus.RUNNING)
+                else:
+                    audio_path = task.file_path
+
                 # 載入音檔
-                waveform, sr = load_audio(task.file_path)
+                waveform, sr = load_audio(audio_path)
                 duration = len(waveform) / sr
                 self._task_manager.update_task(task_index, duration=duration)
+                logger.info("音檔已載入 (%.1f秒)，開始切段", duration)
 
                 # 切段
                 segments = split_audio(waveform, sr, segment_seconds)
+                logger.info("切段完成: %d 段，開始 GPU 轉錄", len(segments))
 
                 # 轉錄
                 def progress_cb(cur, tot, ti=task_index):
@@ -170,6 +196,7 @@ class TranscriptionWorker(QThread):
 
                 self._task_manager.update_task(task_index, status=TaskStatus.SUCCESS)
                 self.task_finished.emit(task_index, self._task_manager.tasks[task_index])
+                logger.info("任務完成: %s", task.file_name)
 
             except Exception as e:
                 err_msg = str(e)
@@ -180,6 +207,20 @@ class TranscriptionWorker(QThread):
                 self.error_occurred.emit(task_index, err_msg)
                 if not continue_on_error:
                     break
+            finally:
+                # 每個任務完成後釋放記憶體，降低 GPU 壓力
+                try:
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()
+                        torch.cuda.empty_cache()
+                    logger.info("任務 %s 資源清理完成", task.file_name)
+                except Exception as cleanup_err:
+                    logger.warning("資源清理時發生錯誤: %s", cleanup_err)
+
+        # 清理暫存檔
+        if not self._config.get("keep_temp_audio", False):
+            audio_extractor.cleanup_temp_dir(temp_dir)
 
         self.all_finished.emit()
 
@@ -318,7 +359,7 @@ class MainWindow(QMainWindow):
 
     def _on_add_file(self):
         files, _ = QFileDialog.getOpenFileNames(
-            self, "選擇音檔", "", "音檔 (*.mp3 *.wav)"
+            self, "選擇媒體檔案", "", "媒體檔案 (*.mp3 *.wav *.mp4 *.mov *.mkv *.avi *.webm)"
         )
         if files:
             self._on_files_dropped(files)
@@ -333,7 +374,7 @@ class MainWindow(QMainWindow):
             if os.path.isdir(p):
                 recursive = self._config.get("scan_subfolders", False)
                 self._task_manager.add_tasks_from_folder(p, recursive=recursive)
-            elif is_supported_audio(p):
+            elif is_supported_media(p):
                 self._task_manager.add_task(p)
         self._status_bar.set_task_count(0, self._task_manager.task_count)
 
