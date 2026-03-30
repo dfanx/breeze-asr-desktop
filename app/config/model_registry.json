@@ -1,0 +1,17 @@
+{
+  "default_model": "breeze_asr_25",
+  "models": {
+    "breeze_asr_25": {
+      "label": "Breeze ASR 25",
+      "hf_repo": "MediaTek-Research/Breeze-ASR-25",
+      "local_dir": "runtime/models/breeze_asr_25",
+      "enabled": true
+    },
+    "breeze_asr_26": {
+      "label": "Breeze ASR 26",
+      "hf_repo": "",
+      "local_dir": "runtime/models/breeze_asr_26",
+      "enabled": false
+    }
+  }
+}

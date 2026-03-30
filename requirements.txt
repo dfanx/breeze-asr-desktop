@@ -1,0 +1,10 @@
+PySide6>=6.7
+torch>=2.0
+torchaudio>=2.0
+transformers>=4.40
+huggingface_hub>=0.20
+librosa>=0.10
+soundfile>=0.12
+accelerate>=0.30
+sentencepiece>=0.2
+numpy>=1.24

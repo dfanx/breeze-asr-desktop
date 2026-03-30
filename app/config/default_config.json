@@ -1,0 +1,11 @@
+{
+  "prefer_gpu": true,
+  "output_dir": "runtime/output",
+  "segment_seconds": 30,
+  "continue_on_error": true,
+  "export_txt": true,
+  "export_full_txt": true,
+  "export_srt": true,
+  "scan_subfolders": false,
+  "default_model": "breeze_asr_25"
+}

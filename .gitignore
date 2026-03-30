@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+.venv-1/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Runtime（含使用者個資路徑的日誌與設定）
+runtime/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 開發規格文件（含內部流程，不公開）
+AI_DEVELOPMENT_SPEC.md
+guide.md
